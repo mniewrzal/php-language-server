@@ -6,6 +6,7 @@ use LanguageServer\Server\TextDocument;
 use LanguageServer\Protocol\{ServerCapabilities, ClientCapabilities, TextDocumentSyncKind, Message};
 use LanguageServer\Protocol\InitializeResult;
 use AdvancedJsonRpc\{Dispatcher, ResponseError, Response as ResponseBody, Request as RequestBody};
+use LanguageServer\Protocol\CompletionOptions;
 
 class LanguageServer extends \AdvancedJsonRpc\Dispatcher
 {
@@ -76,6 +77,10 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
         $serverCapabilities->documentSymbolProvider = true;
         // Support "Format Code"
         $serverCapabilities->documentFormattingProvider = true;
+        
+        $completionOptions = new CompletionOptions();
+        $completionOptions->resolveProvider = false;
+        $serverCapabilities->completionProvider = $completionOptions;
         return new InitializeResult($serverCapabilities);
     }
 

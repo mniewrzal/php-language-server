@@ -15,8 +15,11 @@ use LanguageServer\Protocol\{
     Range,
     Position,
     FormattingOptions,
-    TextEdit
+    TextEdit,
+    CompletionItem,
+    CompletionItemKind
 };
+use LanguageServer\Server\Completion\PHPKeywords;
 
 /**
  * Provides method handlers for all textDocument/* methods
@@ -27,7 +30,7 @@ class TextDocument
      * @var \PhpParser\Parser
      */
     private $parser;
-
+   
     /**
      * A map from file URIs to ASTs
      *
@@ -93,7 +96,7 @@ class TextDocument
     {
         $this->updateAst($textDocument->uri, $contentChanges[0]->text);
     }
-
+    
     /**
      * Re-parses a source file, updates the AST and reports parsing errors that may occured as diagnostics
      *
@@ -129,6 +132,19 @@ class TextDocument
     }
 
     /**
+     * The document close notification is sent from the client to the server when the document got closed in the client.
+     * The document's truth now exists where the document's uri points to (e.g. if the document's
+     * uri is a file uri the truth now exists on disk).
+     *
+     * @param \LanguageServer\Protocol\TextDocumentIdentifier $textDocument
+     * @return void
+     */
+    public function didClose(TextDocumentIdentifier $textDocument)
+    {
+        unset($this->asts[$textDocument->uri]);
+    }
+    
+    /**
      * The document formatting request is sent from the server to the client to format a whole document.
      *
      * @param TextDocumentIdentifier $textDocument The document to format
@@ -146,6 +162,21 @@ class TextDocument
         $edit->range = new Range(new Position(0, 0), new Position(PHP_INT_MAX, PHP_INT_MAX));
         $edit->newText = $prettyPrinter->prettyPrintFile($nodes);
         return [$edit];
+    }
+    
+    public function completion(TextDocumentIdentifier $textDocument, Position $position)
+    {
+        $items = [];
+        $keywords = new PHPKeywords();
+        foreach ($keywords->getKeywords() as $keyword){
+            $item = new CompletionItem();
+            $item->label = $keyword->getLabel();
+            $item->kind = CompletionItemKind::KEYWORD;
+            $item->insertText = $keyword->getInsertText();
+            $item->detail = "PHP Language Server";
+            $items[] = $item;
+        }
+        return $items;
     }
     
 }
