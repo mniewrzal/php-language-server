@@ -17,7 +17,8 @@ use LanguageServer\Protocol\{
     FormattingOptions,
     TextEdit,
     CompletionItem,
-    CompletionItemKind
+    CompletionItemKind,
+    CompletionList
 };
 use LanguageServer\Server\Completion\PHPKeywords;
 
@@ -166,7 +167,9 @@ class TextDocument
     
     public function completion(TextDocumentIdentifier $textDocument, Position $position)
     {
-        $items = [];
+        $list = new CompletionList();
+        $list->isIncomplete = false;
+        $list->items = [];
         $keywords = new PHPKeywords();
         foreach ($keywords->getKeywords() as $keyword){
             $item = new CompletionItem();
@@ -174,9 +177,9 @@ class TextDocument
             $item->kind = CompletionItemKind::KEYWORD;
             $item->insertText = $keyword->getInsertText();
             $item->detail = "PHP Language Server";
-            $items[] = $item;
+            $list->items[] = $item;
         }
-        return $items;
+        return $list;
     }
     
 }
