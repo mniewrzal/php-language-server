@@ -35,7 +35,7 @@ class TextDocument
     /**
      * A map from file URIs to ASTs
      *
-     * @var \PhpParser\Stmt[][]
+     * @var Node[]
      */
     private $asts;
 
@@ -107,7 +107,7 @@ class TextDocument
      */
     private function updateAst(string $uri, string $content)
     {
-        $stmts = $this->parser->parse($content);
+        $ast = $this->parser->parse($content);
         $diagnostics = [];
         foreach ($this->parser->getErrors() as $error) {
             $diagnostic = new Diagnostic();
@@ -123,12 +123,12 @@ class TextDocument
         }
         $this->client->textDocument->publishDiagnostics($uri, $diagnostics);
         // $stmts can be null in case of a fatal parsing error
-        if ($stmts) {
+        if ($ast) {
             $traverser = new NodeTraverser;
             $traverser->addVisitor(new NameResolver);
             $traverser->addVisitor(new ColumnCalculator($content));
-            $traverser->traverse($stmts);
-            $this->asts[$uri] = $stmts;
+            $traverser->traverse($ast);
+            $this->asts[$uri] = $ast;
         }
     }
 
@@ -167,19 +167,49 @@ class TextDocument
     
     public function completion(TextDocumentIdentifier $textDocument, Position $position)
     {
+        $node = $this->findAstNode($textDocument, $position);
+        $editRange = $this->getCompletionEditRange($node, $position);
+        
         $list = new CompletionList();
         $list->isIncomplete = false;
         $list->items = [];
+        
         $keywords = new PHPKeywords();
         foreach ($keywords->getKeywords() as $keyword){
             $item = new CompletionItem();
             $item->label = $keyword->getLabel();
             $item->kind = CompletionItemKind::KEYWORD;
-            $item->insertText = $keyword->getInsertText();
+            $item->textEdit = new TextEdit($editRange, $keyword->getInsertText());
             $item->detail = "PHP Language Server";
             $list->items[] = $item;
         }
         return $list;
+    }
+    
+    private function findAstNode(TextDocumentIdentifier $textDocument, Position $position) {
+        $ast = $this->asts[$textDocument->uri];
+        if ($ast != null) {
+            foreach ($ast as $node) {
+                if ($node->getAttribute('startLine') - 1 <= $position->line &&
+                    $node->getAttribute('endLine') - 1 >= $position->line &&
+                    $node->getAttribute('startColumn') - 1 <= $position->character &&
+                    $node->getAttribute('endColumn') >= $position->character) {
+                    return $node;        
+                }
+            }
+        }
+        return null;
+    }
+    
+    private function getCompletionEditRange(Node $node = null, Position $position = null): Range {
+        if ($node == null) {
+            $start = $position;
+            $end = $position;
+        } else {
+            $start = new Position($node->getAttribute('startLine') - 1, $node->getAttribute('startColumn') - 1);
+            $end = new Position($node->getAttribute('endLine') - 1, $node->getAttribute('endColumn'));
+        }
+        return new Range($start, $end);
     }
     
 }

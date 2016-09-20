@@ -6,7 +6,7 @@ namespace LanguageServer\Tests\Server;
 use PHPUnit\Framework\TestCase;
 use LanguageServer\Tests\MockProtocolStream;
 use LanguageServer\{Server, Client, LanguageClient};
-use LanguageServer\Protocol\{TextDocumentItem, TextDocumentIdentifier, SymbolKind, DiagnosticSeverity, FormattingOptions};
+use LanguageServer\Protocol\{TextDocumentItem, TextDocumentIdentifier, SymbolKind, DiagnosticSeverity, FormattingOptions, Position};
 use AdvancedJsonRpc\{Request as RequestBody, Response as ResponseBody};
 
 class TextDocumentTest extends TestCase
@@ -208,5 +208,37 @@ class TextDocumentTest extends TestCase
             ],
             'newText' => $expected
         ]], json_decode(json_encode($result), true));
+    }
+    
+    public function testCompletion0() {
+        $textDocument = new Server\TextDocument(new LanguageClient(new MockProtocolStream()));
+        // Trigger parsing of source
+        $textDocumentItem = new TextDocumentItem();
+        $textDocumentItem->uri = 'whatever';
+        $textDocumentItem->languageId = 'php';
+        $textDocumentItem->version = 1;
+        $textDocumentItem->text = file_get_contents(__DIR__ . '/../../fixtures/completion0.php');
+        $textDocument->didOpen($textDocumentItem);
+        
+        $result = $textDocument->completion(new TextDocumentIdentifier('whatever'), new Position(2, 0));
+        $this->assertTrue(sizeof($result->items) > 0);
+        $this->assertEquals(new Position(2, 0), $result->items[0]->textEdit->range->start);
+        $this->assertEquals(new Position(2, 0), $result->items[0]->textEdit->range->end);
+    }
+    
+    public function testCompletion1() {
+        $textDocument = new Server\TextDocument(new LanguageClient(new MockProtocolStream()));
+        // Trigger parsing of source
+        $textDocumentItem = new TextDocumentItem();
+        $textDocumentItem->uri = 'whatever';
+        $textDocumentItem->languageId = 'php';
+        $textDocumentItem->version = 1;
+        $textDocumentItem->text = file_get_contents(__DIR__ . '/../../fixtures/completion1.php');
+        $textDocument->didOpen($textDocumentItem);
+        
+        $result = $textDocument->completion(new TextDocumentIdentifier('whatever'), new Position(2, 2));
+        $this->assertTrue(sizeof($result->items) > 0);
+        $this->assertEquals(new Position(2, 0), $result->items[0]->textEdit->range->start);
+        $this->assertEquals(new Position(2, 2), $result->items[0]->textEdit->range->end);
     }
 }

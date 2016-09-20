@@ -60,14 +60,14 @@ class CompletionItem
      */
     public $insertText;
 
-//     /**
-//      * An edit which is applied to a document when selecting
-//      * this completion. When an edit is provided the value of
-//      * insertText is ignored.
-//      *
-//      * @var TextEdit|null
-//      */
-//     public $textEdit;
+    /**
+     * An edit which is applied to a document when selecting
+     * this completion. When an edit is provided the value of
+     * insertText is ignored.
+     *
+     * @var TextEdit|null
+     */
+    public $textEdit;
 
     /**
      * An data entry field that is preserved on a completion item between
