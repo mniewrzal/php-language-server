@@ -14,6 +14,7 @@ use LanguageServer\NodeVisitor\{
 };
 use PhpParser\{Error, Node, NodeTraverser, Parser};
 use PhpParser\NodeVisitor\NameResolver;
+use LanguageServer\Completion\CompletionReporter;
 
 class PhpDocument
 {
@@ -181,6 +182,16 @@ class PhpDocument
 
             $this->stmts = $stmts;
         }
+    }
+
+    /**
+     * @return \LanguageServer\Protocol\CompletionItem[]
+     */
+    public function complete(Position $position)
+    {
+        $completionReporter = new CompletionReporter($this);
+        $completionReporter->complete($position);
+        return $completionReporter->getCompletionItems();
     }
 
     /**

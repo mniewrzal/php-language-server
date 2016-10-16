@@ -56,7 +56,7 @@ class Project
      * If the document is not open, tries to read it from disk, but the document is not added the list of open documents.
      *
      * @param string $uri
-     * @return LanguageServer\PhpDocument
+     * @return \LanguageServer\PhpDocument
      */
     public function getDocument(string $uri)
     {

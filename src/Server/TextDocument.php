@@ -15,6 +15,7 @@ use LanguageServer\Protocol\{
     SymbolInformation,
     ReferenceContext
 };
+use LanguageServer\Protocol\CompletionList;
 
 /**
  * Provides method handlers for all textDocument/* methods
@@ -29,7 +30,7 @@ class TextDocument
     private $client;
 
     /**
-     * @var Project
+     * @var \LanguageServer\Project
      */
     private $project;
 
@@ -147,5 +148,20 @@ class TextDocument
             return [];
         }
         return Location::fromNode($def);
+    }
+
+    /**
+     * @param \LanguageServer\Protocol\TextDocumentIdentifier $textDocument
+     * @param \LanguageServer\Protocol\Position $position
+     *
+     * @return \LanguageServer\Protocol\CompletionList
+     */
+    public function completion(TextDocumentIdentifier $textDocument, Position $position)
+    {
+        $document = $this->project->getDocument($textDocument->uri);
+        $completionList = new CompletionList();
+        $completionList->isIncomplete = false;
+        $completionList->items = $document->complete($position);
+        return $completionList;
     }
 }

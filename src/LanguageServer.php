@@ -14,6 +14,7 @@ use LanguageServer\Protocol\{
 };
 use AdvancedJsonRpc\{Dispatcher, ResponseError, Response as ResponseBody, Request as RequestBody};
 use Sabre\Event\Loop;
+use LanguageServer\Protocol\CompletionOptions;
 
 class LanguageServer extends \AdvancedJsonRpc\Dispatcher
 {
@@ -107,6 +108,10 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
         $serverCapabilities->definitionProvider = true;
         // Support "Find all references"
         $serverCapabilities->referencesProvider = true;
+        // Support code completion 'CTRL+Space'
+        $completionOptions = new CompletionOptions();
+        $completionOptions->resolveProvider = false;
+        $serverCapabilities->completionProvider = $completionOptions;
 
         return new InitializeResult($serverCapabilities);
     }
