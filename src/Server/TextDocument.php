@@ -159,9 +159,6 @@ class TextDocument
     public function completion(TextDocumentIdentifier $textDocument, Position $position)
     {
         $document = $this->project->getDocument($textDocument->uri);
-        $completionList = new CompletionList();
-        $completionList->isIncomplete = false;
-        $completionList->items = $document->complete($position);
-        return $completionList;
+        return $document->complete($position);
     }
 }

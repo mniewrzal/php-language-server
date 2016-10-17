@@ -7,20 +7,22 @@ use LanguageServer\Protocol\ {
     CompletionItem,
     Range,
     Position,
-    TextEdit
+    TextEdit,
+    CompletionItemKind,
+    CompletionList
 };
 use LanguageServer\Completion\Strategies\ {
     KeywordsStrategy,
     VariablesStrategy,
-    ClassMembersStrategy
+    ClassMembersStrategy,
+    GlobalElementsStrategy
 };
 use LanguageServer\PhpDocument;
 use PhpParser\Node;
-use LanguageServer\Protocol\CompletionItemKind;
-use LanguageServer\Completion\Strategies\GlobalElementsStrategy;
 
 class CompletionReporter
 {
+    const MAX_COMPLETION_ITEMS = 500;
 
     /**
      * @var \LanguageServer\PhpDocument
@@ -52,6 +54,9 @@ class CompletionReporter
     {
         $context = new CompletionContext($position, $this->phpDocument);
         foreach ($this->strategies as $strategy) {
+            if (count($this->completionItems) > self::MAX_COMPLETION_ITEMS) {
+                return;
+            }
             $strategy->apply($context, $this);
         }
     }
@@ -112,8 +117,15 @@ class CompletionReporter
         $this->completionItems[] = $item;
     }
 
-    public function getCompletionItems(): array
+    /**
+     *
+     * @return CompletionList
+     */
+    public function getCompletionList(): CompletionList
     {
-        return $this->completionItems;
+        $completionList = new CompletionList();
+        $completionList->isIncomplete = count($this->completionItems) > self::MAX_COMPLETION_ITEMS;
+        $completionList->items = $this->completionItems;
+        return $completionList;
     }
 }

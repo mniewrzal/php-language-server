@@ -185,13 +185,13 @@ class PhpDocument
     }
 
     /**
-     * @return \LanguageServer\Protocol\CompletionItem[]
+     * @return \LanguageServer\Protocol\CompletionList
      */
     public function complete(Position $position)
     {
         $completionReporter = new CompletionReporter($this);
         $completionReporter->complete($position);
-        return $completionReporter->getCompletionItems();
+        return $completionReporter->getCompletionList();
     }
 
     /**
