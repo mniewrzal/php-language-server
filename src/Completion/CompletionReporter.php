@@ -11,9 +11,13 @@ use LanguageServer\Protocol\ {
 };
 use LanguageServer\Completion\Strategies\ {
     KeywordsStrategy,
-    VariablesStrategy
+    VariablesStrategy,
+    ClassMembersStrategy
 };
 use LanguageServer\PhpDocument;
+use PhpParser\Node;
+use LanguageServer\Protocol\CompletionItemKind;
+use LanguageServer\Completion\Strategies\GlobalElementsStrategy;
 
 class CompletionReporter
 {
@@ -38,7 +42,9 @@ class CompletionReporter
         $this->phpDocument = $phpDocument;
         $this->strategies = [
             new KeywordsStrategy(),
-            new VariablesStrategy()
+            new VariablesStrategy(),
+            new ClassMembersStrategy(),
+            new GlobalElementsStrategy()
         ];
     }
 
@@ -50,13 +56,58 @@ class CompletionReporter
         }
     }
 
-    public function report(string $label, int $kind, string $insertText, Range $editRange)
+    public function reportByNode(Node $node, Range $editRange, $doc = '')
+    {
+        if ($node instanceof \PhpParser\Node\Stmt\ClassMethod) {
+            $this->report($node->name, CompletionItemKind::METHOD, $node->name, $editRange, $this->generateMethodSignature($node), $this->getNodePhpDoc($node));
+        } else if ($node instanceof \PhpParser\Node\Stmt\Property) {
+            $doc = $this->getNodePhpDoc($node);
+            foreach ($node->props as $prop) {
+                $this->reportByNode($prop, $editRange, $doc);
+            }
+        } else if ($node instanceof \PhpParser\Node\Stmt\PropertyProperty) {
+            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $doc);
+        } else if ($node instanceof \PhpParser\Node\Stmt\ClassConst) {
+            $doc = $this->getNodePhpDoc($node);
+            foreach ($node->consts as $const) {
+                $this->reportByNode($const, $editRange, $doc);
+            }
+        } else if ($node instanceof \PhpParser\Node\Const_) {
+            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $doc);
+        }
+    }
+
+    private function generateMethodSignature(\PhpParser\Node\Stmt\ClassMethod $node)
+    {
+        $params = [];
+        foreach ($node->params as $param) {
+            $label = $param->type ? ((string) $param->type) . ' ' : '';
+            $label .= '$' . $param->name;
+            $params[] = $label;
+        }
+        $signature = '(' . implode(', ', $params) . ')';
+        if ($node->returnType) {
+            $signature .= ': ' . $node->returnType;
+        }
+        return $signature;
+    }
+
+    private function getNodePhpDoc(Node $node)
+    {
+        if ($node->getDocComment()) {
+            return $node->getDocComment()->getReformattedText();
+        }
+        return '';
+    }
+
+    public function report(string $label, int $kind, string $insertText, Range $editRange, string $detail = 'PHP LS', string $doc = '')
     {
         $item = new CompletionItem();
         $item->label = $label;
         $item->kind = $kind;
         $item->textEdit = new TextEdit($editRange, $insertText);
-        $item->detail = 'PHP Language Server';
+        $item->detail = $detail;
+        $item->documentation = $doc;
 
         $this->completionItems[] = $item;
     }

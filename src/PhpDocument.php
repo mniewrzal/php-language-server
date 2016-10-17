@@ -266,7 +266,7 @@ class PhpDocument
     /**
      * Returns a map from fully qualified name (FQN) to Nodes defined in this document
      *
-     * @return Node[]
+     * @return \PhpParser\Node[]
      */
     public function getDefinitions()
     {

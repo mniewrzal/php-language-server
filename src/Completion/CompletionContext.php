@@ -39,7 +39,7 @@ class CompletionContext
     public function getReplacementRange(): Range
     {
         $token = $this->getTokenContainer()->getToken($this->position);
-        if ($token) {
+        if ($token && $token->getId() == T_STRING) {
             return $token->getRange();
         }
         return new Range($this->position, $this->position);
