@@ -78,6 +78,7 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
 
         $this->textDocument = new Server\TextDocument($this->project, $this->client);
         $this->workspace = new Server\Workspace($this->project, $this->client);
+        $this->completionItem = new Server\CompletionItemResolver($this->project);
     }
 
     /**
@@ -110,7 +111,7 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
         $serverCapabilities->referencesProvider = true;
         // Support code completion 'CTRL+Space'
         $completionOptions = new CompletionOptions();
-        $completionOptions->resolveProvider = false;
+        $completionOptions->resolveProvider = true;
         $serverCapabilities->completionProvider = $completionOptions;
 
         return new InitializeResult($serverCapabilities);

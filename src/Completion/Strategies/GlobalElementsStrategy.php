@@ -8,7 +8,6 @@ use LanguageServer\Completion\ {
     CompletionReporter,
     ICompletionStrategy
 };
-use LanguageServer\Protocol\CompletionItemKind;
 
 class GlobalElementsStrategy implements ICompletionStrategy
 {
@@ -19,24 +18,18 @@ class GlobalElementsStrategy implements ICompletionStrategy
     public function apply(CompletionContext $context, CompletionReporter $reporter)
     {
         $token = $context->getTokenContainer()->getToken($context->getPosition());
-        if ($token->getId() != T_STRING) {
+        if ($token == null || $token->getId() != T_STRING) {
             return;
         }
+
         $range = $context->getReplacementRange($context);
-        $query = $token->getValue();
         $project = $context->getPhpDocument()->project;
         foreach ($project->getDefinitionUris() as $fqn => $uri) {
-            $index = strrpos($fqn, '\\');
-            $name = $index ? substr($fqn, $index + 1) : $fqn;
-            if (strpos($name, '::') === false) {
-                $ns = '\\' . ($index ? substr($fqn, 0, $index) : '');
-                if (stripos($name, $query) !== false) {
-                    if (strpos($name, '()') !== false) {
-                        $reporter->report($name, CompletionItemKind::FUNCTION, $name, $range, $ns);
-                    } else {
-                        $reporter->report($name, CompletionItemKind::_CLASS, $name, $range, '');
-                        $reporter->report($name, CompletionItemKind::_CLASS, '\\' . $fqn, $range, $ns);
-                    }
+            if (strpos($fqn, '::') === false) {
+                $phpDocument = $project->getDefinitionDocument($fqn);
+                if ($phpDocument) {
+                    $node = $phpDocument->getDefinitionByFqn($fqn);
+                    $reporter->reportByNode($node, $range, $fqn);
                 }
             }
         }

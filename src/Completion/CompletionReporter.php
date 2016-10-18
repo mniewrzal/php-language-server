@@ -22,8 +22,6 @@ use PhpParser\Node;
 
 class CompletionReporter
 {
-    const MAX_COMPLETION_ITEMS = 500;
-
     /**
      * @var \LanguageServer\PhpDocument
      */
@@ -54,65 +52,48 @@ class CompletionReporter
     {
         $context = new CompletionContext($position, $this->phpDocument);
         foreach ($this->strategies as $strategy) {
-            if (count($this->completionItems) > self::MAX_COMPLETION_ITEMS) {
-                return;
-            }
             $strategy->apply($context, $this);
         }
     }
 
-    public function reportByNode(Node $node, Range $editRange, $doc = '')
+    public function reportByNode(Node $node, Range $editRange, string $fqn = null)
     {
-        if ($node instanceof \PhpParser\Node\Stmt\ClassMethod) {
-            $this->report($node->name, CompletionItemKind::METHOD, $node->name, $editRange, $this->generateMethodSignature($node), $this->getNodePhpDoc($node));
+        if (!$node) {
+            return;
+        }
+
+        if ($node instanceof \PhpParser\Node\Stmt\Class_) {
+            $this->report($node->name, CompletionItemKind::_CLASS, $node->name, $editRange, $fqn);
+        } else if ($node instanceof \PhpParser\Node\Stmt\Interface_) {
+            $this->report($node->name, CompletionItemKind::INTERFACE, $node->name, $editRange, $fqn);
+        } else if ($node instanceof \PhpParser\Node\Stmt\Trait_) {
+            $this->report($node->name, CompletionItemKind::_CLASS, $node->name, $editRange, $fqn);
+        } else if ($node instanceof \PhpParser\Node\Stmt\Function_) {
+            $this->report($node->name, CompletionItemKind::FUNCTION, $node->name, $editRange, $fqn);
+        } else if ($node instanceof \PhpParser\Node\Stmt\ClassMethod) {
+            $this->report($node->name, CompletionItemKind::METHOD, $node->name, $editRange, $fqn);
         } else if ($node instanceof \PhpParser\Node\Stmt\Property) {
-            $doc = $this->getNodePhpDoc($node);
             foreach ($node->props as $prop) {
-                $this->reportByNode($prop, $editRange, $doc);
+                $this->reportByNode($prop, $editRange, $fqn);
             }
         } else if ($node instanceof \PhpParser\Node\Stmt\PropertyProperty) {
-            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $doc);
+            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $fqn);
         } else if ($node instanceof \PhpParser\Node\Stmt\ClassConst) {
-            $doc = $this->getNodePhpDoc($node);
             foreach ($node->consts as $const) {
-                $this->reportByNode($const, $editRange, $doc);
+                $this->reportByNode($const, $editRange, $fqn);
             }
         } else if ($node instanceof \PhpParser\Node\Const_) {
-            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $doc);
+            $this->report($node->name, CompletionItemKind::FIELD, $node->name, $editRange, $fqn);
         }
     }
 
-    private function generateMethodSignature(\PhpParser\Node\Stmt\ClassMethod $node)
-    {
-        $params = [];
-        foreach ($node->params as $param) {
-            $label = $param->type ? ((string) $param->type) . ' ' : '';
-            $label .= '$' . $param->name;
-            $params[] = $label;
-        }
-        $signature = '(' . implode(', ', $params) . ')';
-        if ($node->returnType) {
-            $signature .= ': ' . $node->returnType;
-        }
-        return $signature;
-    }
-
-    private function getNodePhpDoc(Node $node)
-    {
-        if ($node->getDocComment()) {
-            return $node->getDocComment()->getReformattedText();
-        }
-        return '';
-    }
-
-    public function report(string $label, int $kind, string $insertText, Range $editRange, string $detail = 'PHP LS', string $doc = '')
+    public function report(string $label, int $kind, string $insertText, Range $editRange, string $fqn = null)
     {
         $item = new CompletionItem();
         $item->label = $label;
         $item->kind = $kind;
         $item->textEdit = new TextEdit($editRange, $insertText);
-        $item->detail = $detail;
-        $item->documentation = $doc;
+        $item->data = $fqn;
 
         $this->completionItems[] = $item;
     }
@@ -124,7 +105,7 @@ class CompletionReporter
     public function getCompletionList(): CompletionList
     {
         $completionList = new CompletionList();
-        $completionList->isIncomplete = count($this->completionItems) > self::MAX_COMPLETION_ITEMS;
+        $completionList->isIncomplete = false;
         $completionList->items = $this->completionItems;
         return $completionList;
     }

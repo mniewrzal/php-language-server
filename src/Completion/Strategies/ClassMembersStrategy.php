@@ -25,12 +25,14 @@ class ClassMembersStrategy implements ICompletionStrategy
         }
 
         $nodes = $context->getPhpDocument()->getDefinitions();
-        foreach ($nodes as $node) {
+        foreach ($nodes as $fqn => $node) {
             if ($node instanceof \PhpParser\Node\Stmt\ClassLike) {
                 $nodeRange = Range::fromNode($node);
                 if ($nodeRange->includes($context->getPosition())) {
-                    foreach ($node->stmts as $child) {
-                        $reporter->reportByNode($child, $range);
+                    foreach ($nodes as $childFqn => $child) {
+                        if (stripos($childFqn, $fqn) == 0) {
+                            $reporter->reportByNode($child, $range, $childFqn);
+                        }
                     }
                     return;
                 }
