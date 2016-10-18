@@ -34,16 +34,16 @@ class CompletionItemResolver
      */
     public function resolve($label, $kind, $textEdit, $data)
     {
-        if (!$data) {
-            return;
-        }
-
-        $fqn = $data;
-
         $item = new CompletionItem();
         $item->label = $label;
         $item->kind = $kind;
         $item->textEdit = $textEdit;
+
+        if (!$data) {
+            return $item;
+        }
+        $fqn = $data;
+
         $phpDocument = $this->project->getDefinitionDocument($fqn);
         if (!$phpDocument) {
             return $item;

@@ -8,6 +8,7 @@ use LanguageServer\Completion\ {
     CompletionReporter,
     ICompletionStrategy
 };
+use LanguageServer\Protocol\CompletionItemKind;
 
 class GlobalElementsStrategy implements ICompletionStrategy
 {
@@ -18,18 +19,20 @@ class GlobalElementsStrategy implements ICompletionStrategy
     public function apply(CompletionContext $context, CompletionReporter $reporter)
     {
         $token = $context->getTokenContainer()->getToken($context->getPosition());
-        if ($token == null || $token->getId() != T_STRING) {
+        if ($token == null) {
             return;
         }
 
         $range = $context->getReplacementRange($context);
         $project = $context->getPhpDocument()->project;
         foreach ($project->getDefinitionUris() as $fqn => $uri) {
-            if (strpos($fqn, '::') === false) {
-                $phpDocument = $project->getDefinitionDocument($fqn);
-                if ($phpDocument) {
-                    $node = $phpDocument->getDefinitionByFqn($fqn);
-                    $reporter->reportByNode($node, $range, $fqn);
+            $index = strrpos($fqn, '\\');
+            $name = $index ? substr($fqn, $index + 1) : $fqn;
+            if (strpos($name, ':') === false) {
+                if (strpos($name, '()') !== false) {
+                    $reporter->report($name, CompletionItemKind::FUNCTION, $name, $range, $fqn);
+                } else {
+                    $reporter->report($name, CompletionItemKind::_CLASS, $name, $range, $fqn);
                 }
             }
         }
