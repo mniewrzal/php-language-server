@@ -99,10 +99,6 @@ class KeywordsStrategy implements ICompletionStrategy
     public function apply(CompletionContext $context, CompletionReporter $reporter)
     {
         $range = $context->getReplacementRange();
-        $container = $context->getTokenContainer();
-        if ($container->previousToken()->getId() != T_WHITESPACE) {
-            return;
-        }
 
         foreach (self::KEYWORDS as $keyword) {
             $reporter->report($keyword, CompletionItemKind::KEYWORD, $keyword, $range);

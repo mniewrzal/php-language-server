@@ -22,18 +22,6 @@ class VariablesStrategy implements ICompletionStrategy
     public function apply(CompletionContext $context, CompletionReporter $reporter)
     {
         $range = $context->getReplacementRange();
-//         $node = $context->getNode();
-//         if ($node) {
-//             $parent = $node->getAttribute('parentNode');
-//             if ($parent instanceof \PhpParser\Node\Stmt\ClassLike) {
-//                 return;
-//             }
-
-//             if ($parent instanceof \PhpParser\Node\Stmt\ClassMethod) {
-//                 $reporter->report('$this', CompletionItemKind::VARIABLE, '$this', $range);
-//             }
-//         }
-
         $container = $context->getTokenContainer();
         $tokens = $container->getTokens();
         $variables = [];

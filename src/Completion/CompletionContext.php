@@ -8,8 +8,6 @@ use LanguageServer\Protocol\ {
     Range,
     Position
 };
-use LanguageServer\NodeVisitor\NodeAtPositionFinder;
-use PhpParser\NodeTraverser;
 
 class CompletionContext
 {
@@ -31,25 +29,17 @@ class CompletionContext
      */
     private $tokenContainer;
 
-    private $node;
-
     public function __construct(Position $position, PhpDocument $phpDocument)
     {
         $this->position = $position;
         $this->phpDocument = $phpDocument;
         $this->tokenContainer = new TokenContainer($phpDocument);
-
-        $traverser = new NodeTraverser();
-        $finder = new NodeAtPositionFinder($position);
-        $traverser->addVisitor($finder);
-        $traverser->traverse($phpDocument->getStmts());
-        $this->node = $finder->node;
     }
 
     public function getReplacementRange(): Range
     {
         $token = $this->getTokenContainer()->getToken($this->position);
-        if ($token && $token->getId() == T_STRING) {
+        if ($token && ($token->getId() == T_STRING || $token->getId() == T_VARIABLE)) {
             return $token->getRange();
         }
         return new Range($this->position, $this->position);
@@ -71,8 +61,4 @@ class CompletionContext
         return $this->phpDocument;
     }
 
-    public function getNode()
-    {
-        return $this->node;
-    }
 }
