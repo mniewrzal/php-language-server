@@ -29,7 +29,9 @@ class GlobalElementsStrategy implements ICompletionStrategy
             $index = strrpos($fqn, '\\');
             $name = $index ? substr($fqn, $index + 1) : $fqn;
             if (strpos($name, ':') === false) {
-                if (strpos($name, '()') !== false) {
+                $index = strpos($name, '()');
+                if ($index !== false) {
+                    $name = substr($name, 0, $index);
                     $reporter->report($name, CompletionItemKind::FUNCTION, $name, $range, $fqn);
                 } else {
                     $reporter->report($name, CompletionItemKind::_CLASS, $name, $range, $fqn);

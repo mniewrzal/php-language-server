@@ -93,6 +93,7 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
     {
         // start building project index
         if ($rootPath) {
+            $this->indexProject(__DIR__ . '/../vendor/JetBrains');
             $this->indexProject($rootPath);
         }
 
@@ -149,6 +150,9 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
      */
     private function indexProject(string $rootPath)
     {
+        if (!is_dir($rootPath)) {
+            return;
+        }
         $fileList = findFilesRecursive($rootPath, '/^.+\.php$/i');
         $numTotalFiles = count($fileList);
 
