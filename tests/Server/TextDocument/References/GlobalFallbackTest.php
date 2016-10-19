@@ -6,15 +6,11 @@ namespace LanguageServer\Tests\Server\TextDocument\References;
 use PHPUnit\Framework\TestCase;
 use LanguageServer\Tests\MockProtocolStream;
 use LanguageServer\{Server, LanguageClient, Project};
-use LanguageServer\Protocol\{TextDocumentIdentifier, Position, ReferenceContext};
+use LanguageServer\Protocol\{TextDocumentIdentifier, Position, ReferenceContext, Location, Range};
+use LanguageServer\Tests\Server\ServerTestCase;
 
-class GlobalFallbackTest extends TestCase
+class GlobalFallbackTest extends ServerTestCase
 {
-    /**
-     * @var Server\TextDocument
-     */
-    private $textDocument;
-
     public function setUp()
     {
         $client = new LanguageClient(new MockProtocolStream());
@@ -36,43 +32,15 @@ class GlobalFallbackTest extends TestCase
     {
         // const TEST_CONST = 123;
         // Get references for TEST_CONST
-        $result = $this->textDocument->references(new ReferenceContext, new TextDocumentIdentifier('global_symbols'), new Position(4, 13));
-        $this->assertEquals([
-            [
-                'uri' => 'global_fallback',
-                'range' => [
-                    'start' => [
-                        'line' => 6,
-                        'character' => 5
-                    ],
-                    'end' => [
-                        'line' => 6,
-                        'character' => 15
-                    ]
-                ]
-            ]
-        ], json_decode(json_encode($result), true));
+        $result = $this->textDocument->references(new ReferenceContext, new TextDocumentIdentifier('global_symbols'), new Position(9, 13));
+        $this->assertEquals([new Location('global_fallback', new Range(new Position(6, 5), new Position(6, 15)))], $result);
     }
 
     public function testFallsBackForFunctions()
     {
         // function test_function()
         // Get references for test_function
-        $result = $this->textDocument->references(new ReferenceContext, new TextDocumentIdentifier('global_symbols'), new Position(33, 16));
-        $this->assertEquals([
-            [
-                'uri' => 'global_fallback',
-                'range' => [
-                    'start' => [
-                        'line' => 5,
-                        'character' => 0
-                    ],
-                    'end' => [
-                        'line' => 5,
-                        'character' => 13
-                    ]
-                ]
-            ]
-        ], json_decode(json_encode($result), true));
+        $result = $this->textDocument->references(new ReferenceContext, new TextDocumentIdentifier('global_symbols'), new Position(78, 16));
+        $this->assertEquals([new Location('global_fallback', new Range(new Position(5, 0), new Position(5, 13)))], $result);
     }
 }

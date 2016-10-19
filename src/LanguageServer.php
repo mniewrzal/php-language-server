@@ -109,6 +109,8 @@ class LanguageServer extends \AdvancedJsonRpc\Dispatcher
         $serverCapabilities->definitionProvider = true;
         // Support "Find all references"
         $serverCapabilities->referencesProvider = true;
+        // Support "Hover"
+        $serverCapabilities->hoverProvider = true;
         // Support code completion 'CTRL+Space'
         $completionOptions = new CompletionOptions();
         $completionOptions->resolveProvider = true;
