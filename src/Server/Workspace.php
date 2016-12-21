@@ -4,7 +4,6 @@ declare(strict_types = 1);
 namespace LanguageServer\Server;
 
 use LanguageServer\{LanguageClient, Project};
-use LanguageServer\Index\ProjectIndex;
 use LanguageServer\Protocol\SymbolInformation;
 
 /**
@@ -20,18 +19,15 @@ class Workspace
     private $client;
 
     /**
-     * The symbol index for the workspace
+     * The current project database
      *
-     * @var ProjectIndex
+     * @var Project
      */
-    private $index;
+    private $project;
 
-    /**
-     * @param ProjectIndex $index Index that is searched on a workspace/symbol request
-     */
-    public function __construct(ProjectIndex $index, LanguageClient $client)
+    public function __construct(Project $project, LanguageClient $client)
     {
-        $this->index = $index;
+        $this->project = $project;
         $this->client = $client;
     }
 
@@ -43,10 +39,13 @@ class Workspace
      */
     public function symbol(string $query): array
     {
+        if ($query === '') {
+            return array_values($this->project->getSymbols());
+        }
         $symbols = [];
-        foreach ($this->index->getDefinitions() as $fqn => $definition) {
-            if ($query === '' || stripos($fqn, $query) !== false) {
-                $symbols[] = $definition->symbolInformation;
+        foreach ($this->project->getSymbols() as $fqn => $symbol) {
+            if (stripos($fqn, $query) !== false) {
+                $symbols[] = $symbol;
             }
         }
         return $symbols;

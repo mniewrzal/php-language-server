@@ -27,13 +27,6 @@ class DocBlockParser extends NodeVisitorAbstract
     private $namespace;
 
     /**
-     * Prefix from a parent group use declaration
-     *
-     * @var string
-     */
-    private $prefix;
-
-    /**
      * Namespace aliases in the current context
      *
      * @var string[]
@@ -53,7 +46,6 @@ class DocBlockParser extends NodeVisitorAbstract
     public function beforeTraverse(array $nodes)
     {
         $this->namespace = '';
-        $this->prefix = '';
         $this->aliases = [];
     }
 
@@ -61,10 +53,8 @@ class DocBlockParser extends NodeVisitorAbstract
     {
         if ($node instanceof Node\Stmt\Namespace_) {
             $this->namespace = (string)$node->name;
-        } else if ($node instanceof Node\Stmt\GroupUse) {
-            $this->prefix = (string)$node->prefix . '\\';
         } else if ($node instanceof Node\Stmt\UseUse) {
-            $this->aliases[$node->alias] = $this->prefix . (string)$node->name;
+            $this->aliases[(string)$node->name] = $node->alias;
         }
         $docComment = $node->getDocComment();
         if ($docComment === null) {
@@ -89,8 +79,6 @@ class DocBlockParser extends NodeVisitorAbstract
         if ($node instanceof Node\Stmt\Namespace_) {
             $this->namespace = '';
             $this->aliases = [];
-        } else if ($node instanceof Node\Stmt\GroupUse) {
-            $this->prefix = '';
         }
     }
 }

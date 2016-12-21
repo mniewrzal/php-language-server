@@ -11,7 +11,7 @@ class CompletionOptions
      * The server provides support to resolve additional information for a completion
      * item.
      *
-     * @var bool|null
+     * @var bool
      */
     public $resolveProvider;
 

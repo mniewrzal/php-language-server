@@ -47,11 +47,6 @@ Non-Standard: An empty query will return _all_ symbols found in the workspace.
 ![Error reporting demo](images/publishDiagnostics.png)
 
 PHP parse errors are reported as errors, parse errors of docblocks are reported as warnings.
-Errors/Warnings from the `vendor` directory are ignored.
-
-### Stubs for PHP built-ins
-
-Completion, type resolval etc. will use the standard PHP library and common extensions.
 
 ### What is considered a definition?
 
@@ -94,16 +89,10 @@ Definitions/references/hover currently work for
  - function calls
  - constant access
  - `instanceof` checks
+
+They do not work yet for:
  - Reassigned variables
- - Nested access/calls on return values, properties, array access
-
-### Protocol Extensions
-
-This language server implements the [files protocol extension](https://github.com/sourcegraph/language-server-protocol/blob/master/extension-files.md).
-If the client expresses support through `ClientCapabilities.xfilesProvider` and `ClientCapabilities.xcontentProvider`,
-the server will request files in the workspace and file contents through requests from the client and never access
-the file system directly. This allows the server to operate in an isolated environment like a container,
-on a remote workspace or any a different protocol than `file://`.
+ - Nested access/calls on return values or properties
 
 ## Performance
 
@@ -115,8 +104,6 @@ and consume 76 MB on a Surface Pro 3.
 The language server is fully operational while indexing and can respond to requests with the definitions already indexed.
 Follow-up requests will be almost instant because the index is kept in memory.
 
-Having XDebug enabled heavily impacts performance and can even crash the server if the `max_nesting_level` setting is too low.
-
 ## Versioning
 
 This project follows [semver](http://semver.org/) for the protocol communication and command line parameters,
@@ -125,60 +112,8 @@ New features like request implementations will result in a new minor version.
 Everything else will be a patch release.
 All classes are considered internal and are not subject to semver.
 
-## Installation
-
-The recommended installation method is through [Composer](https://getcomposer.org/).
-Simply run
-
-    composer require felixfbecker/language-server
-
-and you will get the latest stable release and all dependencies.  
-Running `composer update` will update the server to the latest non-breaking version.
-
-After installing the language server and its dependencies,
-you must parse the stubs for standard PHP symbols and save the index for fast initialization.
-
-     composer run-script --working-dir=vendor/felixfbecker/language-server parse-stubs
-
-## Running
-
-Start the language server with
-
-    php vendor/felixfbecker/language-server/bin/php-language-server.php
-
-### Command line arguments
-
-#### `--tcp=host:port` (optional)
-Causes the server to use a tcp connection for communicating with the language client instead of using STDIN/STDOUT.
-The server will try to connect to the specified address.
-Strongly recommended on Windows because of blocking STDIO.
-
-Example:
-
-    php bin/php-language-server.php --tcp=127.0.0.1:12345
-
-#### `--tcp-server=host:port` (optional)
-Causes the server to use a tcp connection for communicating with the language client instead of using STDIN/STDOUT.
-The server will listen on the given address for a connection.
-If PCNTL is available, will fork a child process for every connection.
-If not, will only accept one connection and the connection cannot be reestablished once closed, spawn a new process instead.
-
-Example:
-
-    php bin/php-language-server.php --tcp-server=127.0.0.1:12345
-
-#### `--memory-limit=integer` (optional)
-Sets memory limit for language server.
-Equivalent to [memory-limit](http://php.net/manual/en/ini.core.php#ini.memory-limit) php.ini directive.
-By default there is no memory limit.
-
-Example:
-
-    php bin/php-language-server.php --memory-limit=256M
-
 ## Used by
- - [VS Code PHP IntelliSense](https://github.com/felixfbecker/vscode-php-intellisense)
- - [Eclipse Che](https://eclipse.org/che/)
+ - [vscode-php-intellisense](https://github.com/felixfbecker/vscode-php-intellisense)
 
 ## Contributing
 
@@ -188,9 +123,6 @@ Clone the repository and run
     composer install
 
 to install dependencies.
-Then parse the stubs with
-
-    composer run-script parse-stubs
 
 Run the tests with 
 
@@ -199,3 +131,23 @@ Run the tests with
 Lint with
 
     vendor/bin/phpcs
+
+## Command line arguments
+
+### `--tcp=host:port` (optional)
+Causes the server to use a tcp connection for communicating with the language client instead of using STDIN/STDOUT.
+The server will try to connect to the specified address.
+Strongly recommended on Windows because of blocking STDIO.
+
+Example:
+
+    php bin/php-language-server.php --tcp=127.0.0.1:12345
+
+### `--memory-limit=integer` (optional)
+Sets memory limit for language server.
+Equivalent to [memory-limit](http://php.net/manual/en/ini.core.php#ini.memory-limit) php.ini directive.
+By default there is no memory limit.
+
+Example:
+
+    php bin/php-language-server.php --memory-limit=256M

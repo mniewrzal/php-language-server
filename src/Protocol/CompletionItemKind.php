@@ -2,6 +2,8 @@
 
 namespace LanguageServer\Protocol;
 
+use PhpParser\Node;
+
 /**
  * The kind of a completion entry.
  */
@@ -13,7 +15,7 @@ abstract class CompletionItemKind
     const CONSTRUCTOR = 4;
     const FIELD = 5;
     const VARIABLE = 6;
-    const CLASS_ = 7;
+    const _CLASS = 7;
     const INTERFACE = 8;
     const MODULE = 9;
     const PROPERTY = 10;
@@ -26,45 +28,39 @@ abstract class CompletionItemKind
     const FILE = 17;
     const REFERENCE = 18;
 
-    /**
-     * Returns the CompletionItemKind for a SymbolKind
-     *
-     * @param int $kind A SymbolKind
-     * @return int The CompletionItemKind
-     */
-    public static function fromSymbolKind(int $kind): int
+    public static function fromSymbol(int $symbolKind)
     {
-        switch ($kind) {
-            case SymbolKind::PROPERTY:
-            case SymbolKind::FIELD:
-                return self::PROPERTY;
-            case SymbolKind::METHOD:
-                return self::METHOD;
-            case SymbolKind::CLASS_:
-                return self::CLASS_;
-            case SymbolKind::INTERFACE:
-                return self::INTERFACE;
-            case SymbolKind::FUNCTION:
-                return self::FUNCTION;
-            case SymbolKind::NAMESPACE:
-            case SymbolKind::MODULE:
-            case SymbolKind::PACKAGE:
-                return self::MODULE;
-            case SymbolKind::FILE:
-                return self::FILE;
-            case SymbolKind::STRING:
-                return self::TEXT;
-            case SymbolKind::NUMBER:
-            case SymbolKind::BOOLEAN:
-            case SymbolKind::ARRAY:
-                return self::VALUE;
-            case SymbolKind::ENUM:
-                return self::ENUM;
-            case SymbolKind::CONSTRUCTOR:
-                return self::CONSTRUCTOR;
-            case SymbolKind::VARIABLE:
-            case SymbolKind::CONSTANT:
-                return self::VARIABLE;
-        }
+        $symbolCompletionKindMap = [
+            SymbolKind::CLASS_ => CompletionItemKind::_CLASS,
+            SymbolKind::INTERFACE => CompletionItemKind::INTERFACE,
+            SymbolKind::FUNCTION => CompletionItemKind::FUNCTION,
+            SymbolKind::METHOD => CompletionItemKind::METHOD,
+            SymbolKind::FIELD => CompletionItemKind::FIELD,
+            SymbolKind::CONSTRUCTOR => CompletionItemKind::CONSTRUCTOR,
+            SymbolKind::VARIABLE => CompletionItemKind::VARIABLE,
+        ];
+
+        return $symbolCompletionKindMap[$symbolKind];
     }
+
+    public static function fromNode(Node $node)
+    {
+        $nodeCompletionKindMap = [
+            Node\Stmt\Class_::class           => CompletionItemKind::_CLASS,
+            Node\Stmt\Trait_::class           => CompletionItemKind::_CLASS,
+            Node\Stmt\Interface_::class       => CompletionItemKind::INTERFACE,
+
+            Node\Stmt\Function_::class        => CompletionItemKind::FUNCTION,
+            Node\Stmt\ClassMethod::class      => CompletionItemKind::METHOD,
+            Node\Stmt\PropertyProperty::class => CompletionItemKind::PROPERTY,
+            Node\Const_::class                => CompletionItemKind::FIELD
+        ];
+        $class = get_class($node);
+        if (!isset($nodeCompletionKindMap[$class])) {
+            throw new Exception("Not a declaration node: $class");
+        }
+
+        return $nodeCompletionKindMap[$class];
+    }
+
 }

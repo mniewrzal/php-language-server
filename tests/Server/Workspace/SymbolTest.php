@@ -6,17 +6,7 @@ namespace LanguageServer\Tests\Server\Workspace;
 use LanguageServer\Tests\MockProtocolStream;
 use LanguageServer\Tests\Server\ServerTestCase;
 use LanguageServer\{Server, Client, LanguageClient, Project, PhpDocument};
-use LanguageServer\Protocol\{
-    TextDocumentItem,
-    TextDocumentIdentifier,
-    SymbolInformation,
-    SymbolKind,
-    DiagnosticSeverity,
-    FormattingOptions,
-    Location,
-    Range,
-    Position
-};
+use LanguageServer\Protocol\{TextDocumentItem, TextDocumentIdentifier, SymbolInformation, SymbolKind, DiagnosticSeverity, FormattingOptions};
 use AdvancedJsonRpc\{Request as RequestBody, Response as ResponseBody};
 use function LanguageServer\pathToUri;
 
@@ -26,10 +16,8 @@ class SymbolTest extends ServerTestCase
     {
         // Request symbols
         $result = $this->workspace->symbol('');
-        $referencesUri = pathToUri(realpath(__DIR__ . '/../../../fixtures/references.php'));
         // @codingStandardsIgnoreStart
         $this->assertEquals([
-            new SymbolInformation('TestNamespace',      SymbolKind::NAMESPACE, new Location($referencesUri, new Range(new Position(2, 10), new Position(2, 23))), ''),
             // Namespaced
             new SymbolInformation('TEST_CONST',         SymbolKind::CONSTANT,  $this->getDefinitionLocation('TestNamespace\\TEST_CONST'),                    'TestNamespace'),
             new SymbolInformation('TestClass',          SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\TestClass'),                     'TestNamespace'),
@@ -41,7 +29,6 @@ class SymbolTest extends ServerTestCase
             new SymbolInformation('TestTrait',          SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\TestTrait'),                     'TestNamespace'),
             new SymbolInformation('TestInterface',      SymbolKind::INTERFACE, $this->getDefinitionLocation('TestNamespace\\TestInterface'),                 'TestNamespace'),
             new SymbolInformation('test_function',      SymbolKind::FUNCTION,  $this->getDefinitionLocation('TestNamespace\\test_function()'),               'TestNamespace'),
-            new SymbolInformation('ChildClass',         SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\ChildClass'),                    'TestNamespace'),
             new SymbolInformation('whatever',           SymbolKind::FUNCTION,  $this->getDefinitionLocation('TestNamespace\\whatever()'),                    'TestNamespace'),
             // Global
             new SymbolInformation('TEST_CONST',         SymbolKind::CONSTANT,  $this->getDefinitionLocation('TEST_CONST'),                                   ''),
@@ -54,10 +41,7 @@ class SymbolTest extends ServerTestCase
             new SymbolInformation('TestTrait',          SymbolKind::CLASS_,    $this->getDefinitionLocation('TestTrait'),                                    ''),
             new SymbolInformation('TestInterface',      SymbolKind::INTERFACE, $this->getDefinitionLocation('TestInterface'),                                ''),
             new SymbolInformation('test_function',      SymbolKind::FUNCTION,  $this->getDefinitionLocation('test_function()'),                              ''),
-            new SymbolInformation('ChildClass',         SymbolKind::CLASS_,    $this->getDefinitionLocation('ChildClass'),                                   ''),
-            new SymbolInformation('whatever',           SymbolKind::FUNCTION,  $this->getDefinitionLocation('whatever()'),                                   ''),
-
-            new SymbolInformation('SecondTestNamespace', SymbolKind::NAMESPACE, $this->getDefinitionLocation('SecondTestNamespace'), '')
+            new SymbolInformation('whatever',           SymbolKind::FUNCTION,  $this->getDefinitionLocation('whatever()'),                                   '')
         ], $result);
         // @codingStandardsIgnoreEnd
     }

@@ -3,10 +3,26 @@ declare(strict_types = 1);
 
 namespace LanguageServer;
 
-use Throwable;
 use InvalidArgumentException;
-use PhpParser\Node;
-use Sabre\Event\{Loop, Promise};
+
+/**
+ * Recursively Searches files with matching filename, starting at $path.
+ *
+ * @param string $path
+ * @param string $pattern
+ * @return array
+ */
+function findFilesRecursive(string $path, string $pattern): array
+{
+    $dir = new \RecursiveDirectoryIterator($path);
+    $ite = new \RecursiveIteratorIterator($dir);
+    $files = new \RegexIterator($ite, $pattern, \RegexIterator::GET_MATCH);
+    $fileList = [];
+    foreach ($files as $file) {
+        $fileList = array_merge($fileList, $file);
+    }
+    return $fileList;
+}
 
 /**
  * Transforms an absolute file path into a URI as used by the language server protocol.
@@ -21,9 +37,9 @@ function pathToUri(string $filepath): string
     // Don't %-encode the colon after a Windows drive letter
     $first = array_shift($parts);
     if (substr($first, -1) !== ':') {
-        $first = rawurlencode($first);
+        $first = urlencode($first);
     }
-    $parts = array_map('rawurlencode', $parts);
+    $parts = array_map('urlencode', $parts);
     array_unshift($parts, $first);
     $filepath = implode('/', $parts);
     return 'file:///' . $filepath;
@@ -49,71 +65,4 @@ function uriToPath(string $uri)
         $filepath = str_replace('/', '\\', $filepath);
     }
     return $filepath;
-}
-
-/**
- * Throws an exception on the next tick.
- * Useful for letting a promise crash the process on rejection.
- *
- * @param Throwable $err
- * @return void
- */
-function crash(Throwable $err)
-{
-    Loop\nextTick(function () use ($err) {
-        throw $err;
-    });
-}
-
-/**
- * Returns a promise that is resolved after x seconds.
- * Useful for giving back control to the event loop inside a coroutine.
- *
- * @param int $seconds
- * @return Promise <void>
- */
-function timeout($seconds = 0): Promise
-{
-    $promise = new Promise;
-    Loop\setTimeout([$promise, 'fulfill'], $seconds);
-    return $promise;
-}
-
-/**
- * Returns the closest node of a specific type
- *
- * @param Node $node
- * @param string $type The node class name
- * @return Node|null $type
- */
-function getClosestNode(Node $node, string $type)
-{
-    $n = $node;
-    while ($n = $n->getAttribute('parentNode')) {
-        if ($n instanceof $type) {
-            return $n;
-        }
-    }
-}
-
-/**
- * Returns the part of $b that is not overlapped by $a
- * Example:
- *
- *     stripStringOverlap('whatever<?', '<?php') === 'php'
- *
- * @param string $a
- * @param string $b
- * @return string
- */
-function stripStringOverlap(string $a, string $b): string
-{
-    $aLen = strlen($a);
-    $bLen = strlen($b);
-    for ($i = 1; $i <= $bLen; $i++) {
-        if (substr($b, 0, $i) === substr($a, $aLen - $i)) {
-            return substr($b, $i);
-        }
-    }
-    return $b;
 }

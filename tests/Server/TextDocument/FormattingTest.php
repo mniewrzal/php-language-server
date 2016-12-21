@@ -5,30 +5,29 @@ namespace LanguageServer\Tests\Server\TextDocument;
 
 use PHPUnit\Framework\TestCase;
 use LanguageServer\Tests\MockProtocolStream;
-use LanguageServer\{Server, Client, LanguageClient, PhpDocumentLoader, DefinitionResolver};
-use LanguageServer\Index\{Index, ProjectIndex, DependenciesIndex};
-use LanguageServer\ContentRetriever\FileSystemContentRetriever;
-use LanguageServer\Protocol\{
-    TextDocumentIdentifier,
-    TextDocumentItem,
-    FormattingOptions,
-    ClientCapabilities,
-    TextEdit,
-    Range,
-    Position
-};
+use LanguageServer\{Server, Client, LanguageClient, Project};
+use LanguageServer\Protocol\{TextDocumentIdentifier, TextDocumentItem, FormattingOptions};
 use function LanguageServer\{pathToUri, uriToPath};
 
 class FormattingTest extends TestCase
 {
+    /**
+     * @var Server\TextDocument
+     */
+    private $textDocument;
+
+    public function setUp()
+    {
+        $client = new LanguageClient(new MockProtocolStream, new MockProtocolStream);
+        $project = new Project($client);
+        $this->textDocument = new Server\TextDocument($project, $client);
+    }
+
     public function testFormatting()
     {
-        $projectIndex = new ProjectIndex(new Index, new DependenciesIndex);
         $client = new LanguageClient(new MockProtocolStream, new MockProtocolStream);
-        $definitionResolver = new DefinitionResolver($projectIndex);
-        $loader = new PhpDocumentLoader(new FileSystemContentRetriever, $projectIndex, $definitionResolver);
-        $textDocument = new Server\TextDocument($loader, $definitionResolver, $client, $projectIndex);
-
+        $project = new Project($client);
+        $textDocument = new Server\TextDocument($project, $client);
         $path = realpath(__DIR__ . '/../../../fixtures/format.php');
         $uri = pathToUri($path);
 
@@ -43,7 +42,19 @@ class FormattingTest extends TestCase
         // how code should look after formatting
         $expected = file_get_contents(__DIR__ . '/../../../fixtures/format_expected.php');
         // Request formatting
-        $result = $textDocument->formatting(new TextDocumentIdentifier($uri), new FormattingOptions())->wait();
-        $this->assertEquals([new TextEdit(new Range(new Position(0, 0), new Position(20, 0)), $expected)], $result);
+        $result = $textDocument->formatting(new TextDocumentIdentifier($uri), new FormattingOptions());
+        $this->assertEquals([0 => [
+            'range' => [
+                'start' => [
+                    'line' => 0,
+                    'character' => 0
+                ],
+                'end' => [
+                    'line' => 20,
+                    'character' => 0
+                ]
+            ],
+            'newText' => $expected
+        ]], json_decode(json_encode($result), true));
     }
 }

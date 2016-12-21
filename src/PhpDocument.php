@@ -3,23 +3,40 @@ declare(strict_types = 1);
 
 namespace LanguageServer;
 
-use LanguageServer\Protocol\{Diagnostic, DiagnosticSeverity, Range, Position, TextEdit};
+use LanguageServer\Protocol\{Diagnostic, DiagnosticSeverity, Position, TextEdit};
 use LanguageServer\NodeVisitor\{
     NodeAtPositionFinder,
     ReferencesAdder,
     DocBlockParser,
     DefinitionCollector,
     ColumnCalculator,
-    ReferencesCollector
+    ReferencesCollector,
+    VariableReferencesCollector
 };
-use LanguageServer\Index\Index;
 use PhpParser\{Error, ErrorHandler, Node, NodeTraverser};
 use PhpParser\NodeVisitor\NameResolver;
 use phpDocumentor\Reflection\DocBlockFactory;
-use Sabre\Uri;
+use function LanguageServer\Fqn\{getDefinedFqn, getVariableDefinition, getReferencedFqn};
+use LanguageServer\Completion\CompletionReporter;
 
 class PhpDocument
 {
+    /**
+     * The LanguageClient instance (to report errors etc)
+     *
+     * @var LanguageClient
+     */
+    private $client;
+
+    /**
+     * The Project this document belongs to (to register definitions etc)
+     *
+     * @var Project
+     */
+    public $project;
+    // for whatever reason I get "cannot access private property" error if $project is not public
+    // https://github.com/felixfbecker/php-language-server/pull/49#issuecomment-252427359
+
     /**
      * The PHPParser instance
      *
@@ -33,18 +50,6 @@ class PhpDocument
      * @var DocBlockFactory
      */
     private $docBlockFactory;
-
-    /**
-     * The DefinitionResolver instance to resolve reference nodes to definitions
-     *
-     * @var DefinitionResolver
-     */
-    private $definitionResolver;
-
-    /**
-     * @var Index
-     */
-    private $index;
 
     /**
      * The URI of the document
@@ -68,54 +73,47 @@ class PhpDocument
     private $stmts;
 
     /**
-     * Map from fully qualified name (FQN) to Definition
-     *
-     * @var Definition[]
-     */
-    private $definitions;
-
-    /**
      * Map from fully qualified name (FQN) to Node
      *
      * @var Node[]
      */
-    private $definitionNodes;
+    private $definitions;
 
     /**
      * Map from fully qualified name (FQN) to array of nodes that reference the symbol
      *
      * @var Node[][]
      */
-    private $referenceNodes;
+    private $references;
 
     /**
-     * Diagnostics for this document that were collected while parsing
+     * Map from fully qualified name (FQN) to SymbolInformation
      *
-     * @var Diagnostic[]
+     * @var SymbolInformation[]
      */
-    private $diagnostics;
+    private $symbols;
 
     /**
-     * @param string             $uri                The URI of the document
-     * @param string             $content            The content of the document
-     * @param Index              $index              The Index to register definitions and references to
-     * @param Parser             $parser             The PHPParser instance
-     * @param DocBlockFactory    $docBlockFactory    The DocBlockFactory instance to parse docblocks
-     * @param DefinitionResolver $definitionResolver The DefinitionResolver to resolve definitions to symbols in the workspace
+     *
+     * @var \LanguageServer\Completion\CompletionReporter
      */
-    public function __construct(
-        string $uri,
-        string $content,
-        Index $index,
-        Parser $parser,
-        DocBlockFactory $docBlockFactory,
-        DefinitionResolver $definitionResolver
-    ) {
+    private $completionReporter;
+
+    /**
+     * @param string          $uri             The URI of the document
+     * @param string          $content         The content of the document
+     * @param Project         $project         The Project this document belongs to (to register definitions etc)
+     * @param LanguageClient  $client          The LanguageClient instance (to report errors etc)
+     * @param Parser          $parser          The PHPParser instance
+     * @param DocBlockFactory $docBlockFactory The DocBlockFactory instance to parse docblocks
+     */
+    public function __construct(string $uri, string $content, Project $project, LanguageClient $client, Parser $parser, DocBlockFactory $docBlockFactory)
+    {
         $this->uri = $uri;
-        $this->index = $index;
+        $this->project = $project;
+        $this->client = $client;
         $this->parser = $parser;
         $this->docBlockFactory = $docBlockFactory;
-        $this->definitionResolver = $definitionResolver;
         $this->updateContent($content);
     }
 
@@ -125,9 +123,9 @@ class PhpDocument
      * @param string $fqn The fully qualified name of the symbol
      * @return Node[]
      */
-    public function getReferenceNodesByFqn(string $fqn)
+    public function getReferencesByFqn(string $fqn)
     {
-        return isset($this->referenceNodes) && isset($this->referenceNodes[$fqn]) ? $this->referenceNodes[$fqn] : null;
+        return isset($this->references) && isset($this->references[$fqn]) ? $this->references[$fqn] : null;
     }
 
     /**
@@ -141,31 +139,16 @@ class PhpDocument
     public function updateContent(string $content)
     {
         $this->content = $content;
+        $this->completionReporter = new CompletionReporter($this);
 
-        // Unregister old definitions
-        if (isset($this->definitions)) {
-            foreach ($this->definitions as $fqn => $definition) {
-                $this->index->removeDefinition($fqn);
-            }
-        }
-
-        // Unregister old references
-        if (isset($this->referenceNodes)) {
-            foreach ($this->referenceNodes as $fqn => $node) {
-                $this->index->removeReferenceUri($fqn, $this->uri);
-            }
-        }
-
-        $this->referenceNodes = null;
-        $this->definitions = null;
-        $this->definitionNodes = null;
+        $stmts = null;
 
         $errorHandler = new ErrorHandler\Collecting;
         $stmts = $this->parser->parse($content, $errorHandler);
 
-        $this->diagnostics = [];
+        $diagnostics = [];
         foreach ($errorHandler->getErrors() as $error) {
-            $this->diagnostics[] = Diagnostic::fromError($error, $this->content, DiagnosticSeverity::ERROR, 'php');
+            $diagnostics[] = Diagnostic::fromError($error, $this->content, DiagnosticSeverity::ERROR, 'php');
         }
 
         // $stmts can be null in case of a fatal parsing error
@@ -189,46 +172,50 @@ class PhpDocument
 
             // Report errors from parsing docblocks
             foreach ($docBlockParser->errors as $error) {
-                $this->diagnostics[] = Diagnostic::fromError($error, $this->content, DiagnosticSeverity::WARNING, 'php');
+                $diagnostics[] = Diagnostic::fromError($error, $this->content, DiagnosticSeverity::WARNING, 'php');
             }
 
             $traverser = new NodeTraverser;
 
             // Collect all definitions
-            $definitionCollector = new DefinitionCollector($this->definitionResolver);
+            $definitionCollector = new DefinitionCollector;
             $traverser->addVisitor($definitionCollector);
 
             // Collect all references
-            $referencesCollector = new ReferencesCollector($this->definitionResolver);
+            $referencesCollector = new ReferencesCollector;
             $traverser->addVisitor($referencesCollector);
 
             $traverser->traverse($stmts);
 
+            // Unregister old definitions
+            if (isset($this->definitions)) {
+                foreach ($this->definitions as $fqn => $node) {
+                    $this->project->removeSymbol($fqn);
+                }
+            }
             // Register this document on the project for all the symbols defined in it
             $this->definitions = $definitionCollector->definitions;
-            $this->definitionNodes = $definitionCollector->nodes;
-            foreach ($definitionCollector->definitions as $fqn => $definition) {
-                $this->index->setDefinition($fqn, $definition);
+            $this->symbols = $definitionCollector->symbols;
+            foreach ($definitionCollector->symbols as $fqn => $symbol) {
+                $this->project->setSymbol($fqn, $symbol);
+            }
+
+            // Unregister old references
+            if (isset($this->references)) {
+                foreach ($this->references as $fqn => $node) {
+                    $this->project->removeReferenceUri($fqn, $this->uri);
+                }
             }
             // Register this document on the project for references
-            $this->referenceNodes = $referencesCollector->nodes;
-            foreach ($referencesCollector->nodes as $fqn => $nodes) {
-                $this->index->addReferenceUri($fqn, $this->uri);
+            $this->references = $referencesCollector->references;
+            foreach ($referencesCollector->references as $fqn => $nodes) {
+                $this->project->addReferenceUri($fqn, $this->uri);
             }
 
             $this->stmts = $stmts;
         }
-    }
 
-    /**
-     * Returns true if the document is a dependency
-     *
-     * @return bool
-     */
-    public function isVendored(): bool
-    {
-        $path = Uri\parse($this->uri)['path'];
-        return strpos($path, '/vendor/') !== false;
+        $this->client->textDocument->publishDiagnostics($this->uri, $diagnostics);
     }
 
     /**
@@ -245,6 +232,17 @@ class PhpDocument
     }
 
     /**
+     * @param Position $position
+     *
+     * @return \LanguageServer\Protocol\CompletionList
+     */
+    public function complete(Position $position)
+    {
+        $this->completionReporter->complete($position);
+        return $this->completionReporter->getCompletionList();
+    }
+
+    /**
      * Returns this document's text content.
      *
      * @return string
@@ -252,16 +250,6 @@ class PhpDocument
     public function getContent()
     {
         return $this->content;
-    }
-
-    /**
-     * Returns this document's diagnostics
-     *
-     * @return Diagnostic[]
-     */
-    public function getDiagnostics()
-    {
-        return $this->diagnostics;
     }
 
     /**
@@ -292,9 +280,6 @@ class PhpDocument
      */
     public function getNodeAtPosition(Position $position)
     {
-        if ($this->stmts === null) {
-            return null;
-        }
         $traverser = new NodeTraverser;
         $finder = new NodeAtPositionFinder($position);
         $traverser->addVisitor($finder);
@@ -303,30 +288,14 @@ class PhpDocument
     }
 
     /**
-     * Returns a range of the content
-     *
-     * @param Range $range
-     * @return string|null
-     */
-    public function getRange(Range $range)
-    {
-        if ($this->content === null) {
-            return null;
-        }
-        $start = $range->start->toOffset($this->content);
-        $length = $range->end->toOffset($this->content) - $start;
-        return substr($this->content, $start, $length);
-    }
-
-    /**
      * Returns the definition node for a fully qualified name
      *
      * @param string $fqn
      * @return Node|null
      */
-    public function getDefinitionNodeByFqn(string $fqn)
+    public function getDefinitionByFqn(string $fqn)
     {
-        return $this->definitionNodes[$fqn] ?? null;
+        return $this->definitions[$fqn] ?? null;
     }
 
     /**
@@ -334,19 +303,19 @@ class PhpDocument
      *
      * @return Node[]
      */
-    public function getDefinitionNodes()
+    public function getDefinitions()
     {
-        return $this->definitionNodes;
+        return $this->definitions;
     }
 
     /**
-     * Returns a map from fully qualified name (FQN) to Definition defined in this document
+     * Returns a map from fully qualified name (FQN) to SymbolInformation
      *
-     * @return Definition[]
+     * @return SymbolInformation[]
      */
-    public function getDefinitions()
+    public function getSymbols()
     {
-        return $this->definitions ?? [];
+        return $this->symbols;
     }
 
     /**
@@ -358,5 +327,87 @@ class PhpDocument
     public function isDefined(string $fqn): bool
     {
         return isset($this->definitions[$fqn]);
+    }
+
+    /**
+     * Returns the definition node for any node
+     * The definition node MAY be in another document, check the ownerDocument attribute
+     *
+     * @param Node $node
+     * @return Node|null
+     */
+    public function getDefinitionByNode(Node $node)
+    {
+        // Variables always stay in the boundary of the file and need to be searched inside their function scope
+        // by traversing the AST
+        if ($node instanceof Node\Expr\Variable) {
+            return getVariableDefinition($node);
+        }
+        $fqn = getReferencedFqn($node);
+        if (!isset($fqn)) {
+            return null;
+        }
+        $document = $this->project->getDefinitionDocument($fqn);
+        if (!isset($document)) {
+            // If the node is a function or constant, it could be namespaced, but PHP falls back to global
+            // http://php.net/manual/en/language.namespaces.fallback.php
+            $parent = $node->getAttribute('parentNode');
+            if ($parent instanceof Node\Expr\ConstFetch || $parent instanceof Node\Expr\FuncCall) {
+                $parts = explode('\\', $fqn);
+                $fqn = end($parts);
+                $document = $this->project->getDefinitionDocument($fqn);
+            }
+        }
+        if (!isset($document)) {
+            return null;
+        }
+        return $document->getDefinitionByFqn($fqn);
+    }
+
+    /**
+     * Returns the reference nodes for any node
+     * The references node MAY be in other documents, check the ownerDocument attribute
+     *
+     * @param Node $node
+     * @return Node[]
+     */
+    public function getReferencesByNode(Node $node)
+    {
+        // Variables always stay in the boundary of the file and need to be searched inside their function scope
+        // by traversing the AST
+        if ($node instanceof Node\Expr\Variable || $node instanceof Node\Param) {
+            if ($node->name instanceof Node\Expr) {
+                return null;
+            }
+            // Find function/method/closure scope
+            $n = $node;
+            while (isset($n) && !($n instanceof Node\FunctionLike)) {
+                $n = $n->getAttribute('parentNode');
+            }
+            if (!isset($n)) {
+                $n = $node->getAttribute('ownerDocument');
+            }
+            $traverser = new NodeTraverser;
+            $refCollector = new VariableReferencesCollector($node->name);
+            $traverser->addVisitor($refCollector);
+            $traverser->traverse($n->getStmts());
+            return $refCollector->references;
+        }
+        // Definition with a global FQN
+        $fqn = getDefinedFqn($node);
+        if ($fqn === null) {
+            return [];
+        }
+        $refDocuments = $this->project->getReferenceDocuments($fqn);
+        $nodes = [];
+        foreach ($refDocuments as $document) {
+            $refs = $document->getReferencesByFqn($fqn);
+            if ($refs !== null) {
+                foreach ($refs as $ref) {
+                    $nodes[] = $ref;
+                }
+            }
+        }
+        return $nodes;
     }
 }

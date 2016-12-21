@@ -2,7 +2,7 @@
 
 namespace TestNamespace;
 
-$obj = new TestClass($a, $b, $c);
+$obj = new TestClass();
 $obj->testMethod();
 echo $obj->testProperty;
 TestClass::staticTestMethod();
@@ -34,10 +34,3 @@ use function TestNamespace\test_function;
 if ($abc instanceof TestInterface) {
 
 }
-
-// Nested expressions
-$obj->testProperty->testMethod();
-TestClass::$staticTestProperty[123]->testProperty;
-
-$child = new ChildClass;
-echo $child->testMethod();

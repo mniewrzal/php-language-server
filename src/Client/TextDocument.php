@@ -4,9 +4,8 @@ declare(strict_types = 1);
 namespace LanguageServer\Client;
 
 use LanguageServer\ClientHandler;
-use LanguageServer\Protocol\{Message, TextDocumentItem, TextDocumentIdentifier};
+use LanguageServer\Protocol\Message;
 use Sabre\Event\Promise;
-use JsonMapper;
 
 /**
  * Provides method handlers for all textDocument/* methods
@@ -18,15 +17,9 @@ class TextDocument
      */
     private $handler;
 
-    /**
-     * @var JsonMapper
-     */
-    private $mapper;
-
-    public function __construct(ClientHandler $handler, JsonMapper $mapper)
+    public function __construct(ClientHandler $handler)
     {
         $this->handler = $handler;
-        $this->mapper = $mapper;
     }
 
     /**
@@ -42,22 +35,5 @@ class TextDocument
             'uri' => $uri,
             'diagnostics' => $diagnostics
         ]);
-    }
-
-    /**
-     * The content request is sent from a server to a client
-     * to request the current content of a text document identified by the URI
-     *
-     * @param TextDocumentIdentifier $textDocument The document to get the content for
-     * @return Promise <TextDocumentItem> The document's current content
-     */
-    public function xcontent(TextDocumentIdentifier $textDocument): Promise
-    {
-        return $this->handler->request(
-            'textDocument/xcontent',
-            ['textDocument' => $textDocument]
-        )->then(function ($result) {
-            return $this->mapper->map($result, new TextDocumentItem);
-        });
     }
 }

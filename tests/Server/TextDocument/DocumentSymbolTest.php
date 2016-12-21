@@ -15,10 +15,9 @@ class DocumentSymbolTest extends ServerTestCase
     {
         // Request symbols
         $uri = pathToUri(realpath(__DIR__ . '/../../../fixtures/symbols.php'));
-        $result = $this->textDocument->documentSymbol(new TextDocumentIdentifier($uri))->wait();
+        $result = $this->textDocument->documentSymbol(new TextDocumentIdentifier($uri));
         // @codingStandardsIgnoreStart
         $this->assertEquals([
-            new SymbolInformation('TestNamespace',      SymbolKind::NAMESPACE, $this->getDefinitionLocation('TestNamespace'),                                ''),
             new SymbolInformation('TEST_CONST',         SymbolKind::CONSTANT,  $this->getDefinitionLocation('TestNamespace\\TEST_CONST'),                    'TestNamespace'),
             new SymbolInformation('TestClass',          SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\TestClass'),                     'TestNamespace'),
             new SymbolInformation('TEST_CLASS_CONST',   SymbolKind::CONSTANT,  $this->getDefinitionLocation('TestNamespace\\TestClass::TEST_CLASS_CONST'),   'TestNamespace\\TestClass'),
@@ -29,7 +28,6 @@ class DocumentSymbolTest extends ServerTestCase
             new SymbolInformation('TestTrait',          SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\TestTrait'),                     'TestNamespace'),
             new SymbolInformation('TestInterface',      SymbolKind::INTERFACE, $this->getDefinitionLocation('TestNamespace\\TestInterface'),                 'TestNamespace'),
             new SymbolInformation('test_function',      SymbolKind::FUNCTION,  $this->getDefinitionLocation('TestNamespace\\test_function()'),               'TestNamespace'),
-            new SymbolInformation('ChildClass',         SymbolKind::CLASS_,    $this->getDefinitionLocation('TestNamespace\\ChildClass'),                    'TestNamespace'),
         ], $result);
         // @codingStandardsIgnoreEnd
     }

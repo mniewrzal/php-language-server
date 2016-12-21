@@ -5,12 +5,9 @@ namespace LanguageServer\Tests\Server\TextDocument;
 
 use PHPUnit\Framework\TestCase;
 use LanguageServer\Tests\MockProtocolStream;
-use LanguageServer\{Server, Client, LanguageClient, ClientHandler, PhpDocumentLoader, DefinitionResolver};
-use LanguageServer\Index\{Index, ProjectIndex, DependenciesIndex};
-use LanguageServer\ContentRetriever\FileSystemContentRetriever;
-use LanguageServer\Protocol\{TextDocumentIdentifier, TextDocumentItem, DiagnosticSeverity, ClientCapabilities};
+use LanguageServer\{Server, Client, LanguageClient, Project, ClientHandler};
+use LanguageServer\Protocol\{TextDocumentIdentifier, TextDocumentItem, DiagnosticSeverity};
 use Sabre\Event\Promise;
-use JsonMapper;
 
 class ParseErrorsTest extends TestCase
 {
@@ -28,7 +25,7 @@ class ParseErrorsTest extends TestCase
             private $args;
             public function __construct(&$args)
             {
-                parent::__construct(new ClientHandler(new MockProtocolStream, new MockProtocolStream), new JsonMapper);
+                parent::__construct(new ClientHandler(new MockProtocolStream, new MockProtocolStream));
                 $this->args = &$args;
             }
             public function publishDiagnostics(string $uri, array $diagnostics): Promise
@@ -37,10 +34,8 @@ class ParseErrorsTest extends TestCase
                 return Promise\resolve(null);
             }
         };
-        $projectIndex = new ProjectIndex(new Index, new DependenciesIndex);
-        $definitionResolver = new DefinitionResolver($projectIndex);
-        $loader = new PhpDocumentLoader(new FileSystemContentRetriever, $projectIndex, $definitionResolver);
-        $this->textDocument = new Server\TextDocument($loader, $definitionResolver, $client, $projectIndex);
+        $project = new Project($client);
+        $this->textDocument = new Server\TextDocument($project, $client);
     }
 
     private function openFile($file)

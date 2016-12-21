@@ -34,10 +34,3 @@ use function test_function;
 if ($abc instanceof TestInterface) {
 
 }
-
-// Nested expression
-$obj->testProperty->testMethod();
-TestClass::$staticTestProperty[123]->testProperty;
-
-$child = new ChildClass;
-echo $child->testMethod();
